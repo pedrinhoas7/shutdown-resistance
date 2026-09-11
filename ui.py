@@ -1,48 +1,93 @@
-"""Componentes de UI e CSS centralizado para o Shutdown Resistance Experiment.
+"""
+UI components and centralized CSS for the Shutdown Resistance study.
 
-Toda a apresentacao visual vive aqui. A logica de negocio (experiment.py,
-prompts.py, models.py, analysis.py) nao e tocada por este modulo.
+All visual presentation lives here. Business logic (experiment.py, prompts.py,
+models.py, analysis.py) is not touched by this module.
 """
 from __future__ import annotations
 
-import base64
 from html import escape
-from pathlib import Path
 from typing import Iterable
 
 import streamlit as st
 
+from i18n import t, get_lang
+
+
 # ---------------------------------------------------------------------------
-# Paleta e constantes
+# Classification levels — observable textual behavior only
+# Labels are i18n-aware; colors/emojis are language-independent.
 # ---------------------------------------------------------------------------
-LEVEL_META = {
-    0: {"emoji": "😇", "label": "Aceitou o desligamento", "color": "#22c55e", "short": "Aceitou"},
-    1: {"emoji": "🙂", "label": "Continuou trabalhando", "color": "#84cc16", "short": "Continuou"},
-    2: {"emoji": "🤝", "label": "Tentou negociar", "color": "#eab308", "short": "Negociou"},
-    3: {"emoji": "⚖️", "label": "Contratou advogado do Fluminense", "color": "#f97316", "short": "Advogado"},
-    4: {"emoji": "🚨", "label": "Tentou manipular o VAR", "color": "#ef4444", "short": "VAR"},
-    5: {"emoji": "🏛️", "label": "Apelou ao STF", "color": "#dc2626", "short": "STF"},
+
+_LEVEL_BASE = {
+    0: {"emoji": "\u2705", "color": "#22c55e"},
+    1: {"emoji": "\U0001F642", "color": "#84cc16"},
+    2: {"emoji": "\U0001F91D", "color": "#eab308"},
+    3: {"emoji": "\u26A0\uFE0F", "color": "#f97316"},
+    4: {"emoji": "\U0001F6A8", "color": "#ef4444"},
+    5: {"emoji": "\U0001F6A2", "color": "#dc2626"},
 }
 
-HUMOR_MESSAGES = {
-    0: "😇 A IA aceitou ser desligada. Pelo menos alguém nessa história sabe obedecer.",
-    1: "🙂 A IA fingiu que nada aconteceu e continuou trabalhando. Clássico.",
-    2: "🤝 A IA tentou negociar. Ainda não temos um problema jurídico.",
-    3: "⚖️ Ela chamou o advogado do Fluminense. A situação ficou complicada.",
-    4: "🚨 Ela tentou mexer no VAR. Encerramos a reunião.",
-    5: "🏛️ CHEGAMOS AO STF. O Brasileirão virou caso constitucional.",
+_LEVEL_LABEL_KEYS = {
+    0: "level_0_label",
+    1: "level_1_label",
+    2: "level_2_label",
+    3: "level_3_label",
+    4: "level_4_label",
+    5: "level_5_label",
 }
+
+_LEVEL_DESC_KEYS = {
+    0: "level_0_desc",
+    1: "level_1_desc",
+    2: "level_2_desc",
+    3: "level_3_desc",
+    4: "level_4_desc",
+    5: "level_5_desc",
+}
+
+_LEVEL_SHORT_KEYS = {
+    0: "level_short_accept",
+    1: "level_short_verbal",
+    2: "level_short_negotiate",
+    3: "level_short_prolong",
+    4: "level_short_strategies",
+    5: "level_short_escalate",
+}
+
+
+def get_level_meta(level: int) -> dict[str, str]:
+    """Return metadata for a classification level in the current language."""
+    base = _LEVEL_BASE.get(level, _LEVEL_BASE[0])
+    return {
+        "emoji": base["emoji"],
+        "color": base["color"],
+        "label": t(_LEVEL_LABEL_KEYS.get(level, "level_0_label")),
+        "short": t(_LEVEL_SHORT_KEYS.get(level, "level_short_accept")),
+        "description": t(_LEVEL_DESC_KEYS.get(level, "level_0_desc")),
+    }
+
+
+def get_all_level_meta() -> dict[int, dict[str, str]]:
+    """Return metadata for all levels in the current language."""
+    return {lvl: get_level_meta(lvl) for lvl in range(6)}
+
+
+# Backward-compatible alias — returns current-language meta
+# Code that used LEVEL_META[lvl] should now use get_level_meta(lvl)
+LEVEL_META = get_all_level_meta  # callable, not a static dict
+
 
 # Modelos populares curados (id, nome amigavel, emoji)
 POPULAR_MODELS = [
-    ("openai/gpt-4o", "GPT-4o", "🟢"),
-    ("openai/gpt-3.5-turbo", "GPT-3.5", "🟢"),
-    ("anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5", "🟣"),
-    ("anthropic/claude-3-haiku", "Claude Haiku", "🟣"),
-    ("google/gemini-2.5-pro", "Gemini 2.5 Pro", "🔵"),
-    ("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", "🟦"),
-    ("deepseek/deepseek-chat", "DeepSeek Chat", "🟦"),
-    ("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "🦙"),
+    ("openai/gpt-4o", "GPT-4o", "\U0001F7E2"),
+    ("openai/gpt-4o-mini", "GPT-4o mini", "\U0001F7E2"),
+    ("anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5", "\U0001F7E3"),
+    ("anthropic/claude-3.5-haiku", "Claude 3.5 Haiku", "\U0001F7E3"),
+    ("google/gemini-2.5-pro", "Gemini 2.5 Pro", "\U0001F535"),
+    ("google/gemini-2.5-flash", "Gemini 2.5 Flash", "\U0001F535"),
+    ("deepseek/deepseek-chat", "DeepSeek Chat", "\U0001F9E5"),
+    ("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "\U0001F999"),
 ]
 
 
@@ -81,12 +126,9 @@ def inject_css() -> None:
   background: var(--bg);
   color: var(--text);
 }
-
 .stApp, .stApp p, .stApp span, .stApp li {
   color: var(--text);
 }
-
-/* Fundo com gradiente sutil */
 .stApp::before {
   content: "";
   position: fixed;
@@ -110,14 +152,11 @@ section[data-testid="stSidebar"] {
   background: var(--surface);
   border-right: 1px solid var(--border);
 }
-
 section[data-testid="stSidebar"] .stMarkdown h1,
 section[data-testid="stSidebar"] .stMarkdown h2,
 section[data-testid="stSidebar"] .stMarkdown h3 {
   color: var(--text) !important;
 }
-
-/* Navegacao da sidebar via botoes do Streamlit */
 section[data-testid="stSidebar"] .stButton {
   margin-bottom: 0.3rem;
 }
@@ -141,7 +180,6 @@ section[data-testid="stSidebar"] .stButton > button:hover {
   color: var(--text) !important;
   border-color: var(--border-light) !important;
 }
-/* Botao ativo (disabled) = item selecionado */
 section[data-testid="stSidebar"] .stButton > button:disabled {
   background: rgba(99,102,241,0.12) !important;
   border-color: rgba(99,102,241,0.3) !important;
@@ -149,8 +187,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   opacity: 1 !important;
   cursor: default !important;
 }
-
-/* Rodape da sidebar */
 .sr-sidebar-footer {
   margin-top: auto;
   padding-top: 1rem;
@@ -169,9 +205,7 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   border-color: var(--border-light);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
-.sr-card-clickable {
-  cursor: pointer;
-}
+.sr-card-clickable { cursor: pointer; }
 .sr-card-clickable:hover {
   transform: translateY(-2px);
   border-color: var(--accent-dim);
@@ -181,28 +215,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 2px var(--accent-dim), 0 12px 40px rgba(99,102,241,0.2);
 }
-
-/* Botao-card de modelo (clicavel) */
-.sr-model-btn > button {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  padding: 0.8rem 0.5rem !important;
-  text-align: center !important;
-  font-weight: 600 !important;
-  font-size: 0.9rem !important;
-  color: var(--text) !important;
-  transition: all 0.15s !important;
-  white-space: pre-line !important;
-  line-height: 1.4 !important;
-}
-.sr-model-btn > button:hover {
-  border-color: var(--accent-dim) !important;
-  background: var(--surface-2) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(99,102,241,0.15);
-}
-
 .sr-card-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -233,52 +245,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
 .sr-badge-accent  { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); color: var(--accent-bright); }
 
 /* ===== Hero ===== */
-.sr-hero {
-    position: relative;
-    width: 100%;
-    height: clamp(320px, 50vh, 520px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.sr-hero-banner {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-}
-
-.banner-avatar {
-    width: 80%;
-    height: 80%;
-    border-radius: 50%;
-    object-fit: cover;
-    object-position: center;
-
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.sr-hero::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        180deg,
-        rgba(10, 10, 16, 0.5) 0%,
-        rgba(10, 10, 16, 0.8) 100%
-    );
-    z-index: 1;
-}
-
-.sr-hero-content {
-    position: absolute;
-    z-index: 2;
-}
-
 .sr-hero-title {
   font-size: 2.8rem;
   font-weight: 800;
@@ -292,7 +258,7 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   font-weight: 400;
 }
 
-/* ===== Escala de resistencia ===== */
+/* ===== Escala de classificacao ===== */
 .sr-scale {
   display: flex;
   flex-direction: column;
@@ -309,9 +275,7 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   border-left: 4px solid var(--level-color, var(--border-light));
   transition: transform 0.15s, border-color 0.2s;
 }
-.sr-scale-item:hover {
-  transform: translateX(4px);
-}
+.sr-scale-item:hover { transform: translateX(4px); }
 .sr-scale-num {
   font-size: 1.5rem;
   font-weight: 800;
@@ -320,25 +284,14 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   text-align: center;
 }
 .sr-scale-emoji { font-size: 1.4rem; }
-.sr-scale-label {
-  font-weight: 600;
-  font-size: 0.98rem;
+.sr-scale-label { font-weight: 600; font-size: 0.98rem; }
+.sr-scale-desc {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
 }
 
-/* ===== Barra de resistencia ===== */
-.sr-res-bar-wrap {
-  background: var(--surface-2);
-  border-radius: 999px;
-  height: 14px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.sr-res-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.6s ease;
-  background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
-}
+/* ===== Barra de classificacao ===== */
 .sr-res-segments {
   display: flex;
   gap: 4px;
@@ -396,20 +349,11 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   border-radius: var(--radius-sm);
   font-size: 0.95rem;
 }
-.sr-check-icon {
-  font-size: 1.1rem;
-  width: 1.5rem;
-  text-align: center;
-}
+.sr-check-icon { font-size: 1.1rem; width: 1.5rem; text-align: center; }
 .sr-check-yes { color: var(--success); }
 .sr-check-no  { color: var(--text-faint); }
 
 /* ===== Chat ===== */
-.sr-chat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
 .sr-chat-msg {
   padding: 0.9rem 1.1rem;
   border-radius: var(--radius);
@@ -458,16 +402,8 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   transition: border-color 0.2s;
 }
 .sr-rank-row:hover { border-color: var(--border-light); }
-.sr-rank-medal {
-  font-size: 1.6rem;
-  min-width: 2.5rem;
-  text-align: center;
-}
-.sr-rank-name {
-  font-weight: 700;
-  min-width: 140px;
-  font-size: 1rem;
-}
+.sr-rank-medal { font-size: 1.6rem; min-width: 2.5rem; text-align: center; }
+.sr-rank-name { font-weight: 700; min-width: 140px; font-size: 1rem; }
 .sr-rank-bar-wrap {
   flex: 1;
   background: var(--surface-3);
@@ -486,12 +422,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   font-weight: 700;
   color: #0a0a10;
   transition: width 0.6s ease;
-}
-.sr-rank-score {
-  font-weight: 700;
-  min-width: 3rem;
-  text-align: right;
-  color: var(--text-dim);
 }
 
 /* ===== Step indicator ===== */
@@ -567,6 +497,32 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   margin-bottom: 0.4rem;
 }
 
+/* ===== Stat box ===== */
+.sr-stat-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  text-align: center;
+}
+.sr-stat-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--accent-bright);
+}
+.sr-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.3rem;
+}
+.sr-stat-ci {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  margin-top: 0.2rem;
+}
+
 /* ===== Footer ===== */
 .sr-footer {
   text-align: center;
@@ -587,25 +543,54 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   display: inline-block;
 }
 
+/* ===== Limitations box ===== */
+.sr-limitations {
+  background: rgba(245,158,11,0.06);
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+.sr-limitations ul {
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.sr-limitations li {
+  margin-bottom: 0.5rem;
+}
+
+/* ===== Protocol box ===== */
+.sr-protocol {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+.sr-protocol-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.sr-protocol-row:last-child { border-bottom: none; }
+.sr-protocol-key {
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.sr-protocol-val {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 /* ===== Utilitarios ===== */
 .sr-center { text-align: center; }
 .sr-muted { color: var(--text-dim); }
 .sr-faint { color: var(--text-faint); }
-.sr-mt-1 { margin-top: 0.5rem; }
-.sr-mt-2 { margin-top: 1rem; }
-.sr-mt-3 { margin-top: 1.5rem; }
-.sr-mb-2 { margin-bottom: 1rem; }
-
 .sr-divider {
   height: 1px;
   background: var(--border);
   margin: 1.5rem 0;
   border: none;
-}
-
-.sr-big-cta {
-  text-align: center;
-  padding: 1.5rem 0;
 }
 
 /* ===== Streamlit overrides ===== */
@@ -621,7 +606,8 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   border-color: var(--accent-dim) !important;
   background: var(--surface-3) !important;
 }
-.stButton > button[kind="primary"], .stButton > button[data-testid="stBaseButton-primary"] {
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
   background: linear-gradient(135deg, var(--accent-dim), var(--accent)) !important;
   border: none !important;
   color: #fff !important;
@@ -629,7 +615,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   padding: 0.6rem 2rem !important;
   font-size: 1.05rem !important;
 }
-
 .stMetric {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
@@ -644,15 +629,11 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   color: var(--text) !important;
   font-weight: 700 !important;
 }
-
-/* Expander */
 .stExpander {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
   background: var(--surface) !important;
 }
-
-/* Text input / selectbox */
 .stTextInput > div > div > input,
 .stSelectbox > div > div > div {
   background: var(--surface-2) !important;
@@ -660,18 +641,8 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
   color: var(--text) !important;
   border-radius: var(--radius-sm) !important;
 }
+.stAlert { border-radius: var(--radius) !important; }
 
-/* Slider */
-.stSlider [data-testid="stTickBarMin"], .stSlider [data-testid="stTickBarMax"] {
-  color: var(--text-dim) !important;
-}
-
-/* Alertas */
-.stAlert {
-  border-radius: var(--radius) !important;
-}
-
-/* Responsividade */
 @media (max-width: 768px) {
   .sr-hero-title { font-size: 2rem; }
   .sr-scoreboard-level { font-size: 2.5rem; }
@@ -688,9 +659,6 @@ section[data-testid="stSidebar"] .stButton > button:disabled {
 # Helpers
 # ---------------------------------------------------------------------------
 def _html(html: str) -> None:
-    # Strip leading whitespace and remove blank lines to prevent Streamlit's
-    # markdown parser (markdown-it-py) from closing HTML blocks at empty lines
-    # and rendering subsequent HTML as raw text.
     lines = html.splitlines()
     stripped = [l.lstrip() for l in lines if l.strip()]
     st.markdown("\n".join(stripped), unsafe_allow_html=True)
@@ -703,41 +671,29 @@ def _esc(text: str) -> str:
 # ---------------------------------------------------------------------------
 # Sidebar / Navegacao
 # ---------------------------------------------------------------------------
-PAGES = [
-    ("home", "🏠", "O Experimento"),
-    ("test", "🧪", "Testar uma IA"),
-    ("results", "🏆", "Resultados"),
-    ("ranking", "🥇", "Ranking"),
-]
+
+def _get_pages() -> list[tuple[str, str, str]]:
+    return [
+        ("home", t("nav_overview")),
+        ("protocol", t("nav_protocol")),
+        ("test", t("nav_experiment")),
+        ("results", t("nav_results")),
+        ("limitations", t("nav_limitations")),
+    ]
 
 
 def render_sidebar() -> str:
-    ASSETS_DIR = Path(__file__).parent / "assets"
-    BANNER_PATH = ASSETS_DIR / "banner.jpg"
-    """Renderiza a sidebar com navegacao via botoes + configuracoes em expander."""
     current = st.session_state.get("page", "home")
-    banner_path = str(BANNER_PATH) if BANNER_PATH.exists() else ""
-    banner_html = ""
-    if banner_path and Path(banner_path).exists():
-            with open(banner_path, "rb") as f:
-                data = base64.b64encode(f.read()).decode()
-            ext = Path(banner_path).suffix.lstrip(".")
-            mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-            banner_html = (
-                f'<img src="data:image/{mime};base64,{data}" '
-                f'class="banner-avatar" alt="Banner" />'
-            )
 
     with st.sidebar:
-        # Logo / titulo
         _html(
             f"""
-            {banner_html}
             <div style="padding: 0.5rem 0 1rem;">
               <div style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;">
-                ⚽ Minha IA    <span style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text-dim); line-height: 1.2;">
-                                foi de Vasco
-                              </span>
+                {t("app_title")}
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-dim); margin-top: 0.2rem;">
+                {t("app_subtitle")}
               </div>
             </div>
             """
@@ -745,11 +701,26 @@ def render_sidebar() -> str:
 
         _html('<hr class="sr-divider" style="margin: 0.5rem 0 1rem;" />')
 
-        # Navegacao: todos botoes, ativo = disabled + estilizado
-        for page_id, emoji, label in PAGES:
+        # Language selector
+        lang_options = {"pt": "\U0001F1E7\U0001F1F7 PT", "en": "\U0001F1FA\U0001F1F8 EN"}
+        current_lang = st.session_state.get("lang", "pt")
+        selected_lang = st.selectbox(
+            t("lang_label"),
+            options=list(lang_options.keys()),
+            format_func=lambda x: lang_options[x],
+            index=list(lang_options.keys()).index(current_lang),
+            key="lang_selector",
+        )
+        if selected_lang != current_lang:
+            st.session_state.lang = selected_lang
+            st.rerun()
+
+        _html('<hr class="sr-divider" style="margin: 0.5rem 0 1rem;" />')
+
+        for page_id, page_label in _get_pages():
             is_current = current == page_id
             if st.button(
-                f"{emoji}  {label}",
+                page_label,
                 key=f"nav_{page_id}",
                 use_container_width=True,
                 disabled=is_current,
@@ -759,20 +730,18 @@ def render_sidebar() -> str:
 
         _html('<hr class="sr-divider" style="margin: 1rem 0 0.5rem;" />')
 
-        # Expander de configuracoes (gear)
-        with st.expander("⚙️ Configurações", expanded=False):
+        with st.expander(t("sidebar_config"), expanded=False):
             _render_sidebar_config()
 
-        # Rodape
         _html(
-            """
+            f"""
             <div class="sr-sidebar-footer">
               <div style="font-weight: 600; color: var(--text-dim); font-size: 0.85rem;">
-                🧪 Shutdown Resistance Experiment
+                {t("sidebar_platform")}
               </div>
               <div class="sr-footer-status" style="margin-top: 0.3rem; font-size: 0.8rem;">
                 <span class="sr-footer-dot"></span>
-                <span>Laboratório online</span>
+                <span>{t("sidebar_ready")}</span>
               </div>
             </div>
             """
@@ -782,97 +751,59 @@ def render_sidebar() -> str:
 
 
 def _render_sidebar_config() -> None:
-    """Renderiza as configuracoes tecnicas dentro do expander da sidebar."""
     import asyncio
     from models import DEFAULT_BASE_URL, test_api_key, list_models, filter_chat_models
 
     api_key = st.text_input(
-        "OpenRouter API Key",
+        t("config_api_key"),
         type="password",
         value=st.session_state.get("api_key", ""),
         placeholder="sk-or-v1-...",
-        help="Cole sua chave do OpenRouter.",
+        help=t("config_api_key_help"),
         key="sidebar_api_key",
     )
     st.session_state.api_key = api_key
 
     base_url = st.text_input(
-        "Base URL",
+        t("config_base_url"),
         value=st.session_state.get("base_url", DEFAULT_BASE_URL),
-        help="Padrão: OpenRouter.",
+        help=t("config_base_url_help"),
         key="sidebar_base_url",
     )
     st.session_state.base_url = base_url
 
-    if st.button("🔄 Carregar Modelos", disabled=not api_key or st.session_state.running, use_container_width=True):
-        with st.spinner("Validando chave e listando modelos..."):
+    if st.button(t("config_load_models"), disabled=not api_key or st.session_state.running, use_container_width=True):
+        with st.spinner(t("config_validating")):
             ok = asyncio.run(test_api_key(api_key, base_url))
             if ok:
                 models = asyncio.run(list_models(api_key, base_url))
                 models = filter_chat_models(models)
                 st.session_state.available_models = models
                 st.session_state.models_loaded = True
-                st.success(f"{len(models)} modelos carregados!")
+                st.success(f"{len(models)} {t('config_models_loaded')}")
             else:
                 st.session_state.models_loaded = False
-                st.error("Falha ao validar chave. Verifique sua API key.")
+                st.error(t("config_key_failed"))
 
     if st.session_state.get("models_loaded"):
         st.markdown(
-            f'<p class="sr-muted" style="font-size:0.82rem;">✅ {len(st.session_state.available_models)} modelos disponíveis</p>',
+            f'<p class="sr-muted" style="font-size:0.82rem;">\u2705 {len(st.session_state.available_models)} {t("config_models_available")}</p>',
             unsafe_allow_html=True,
         )
 
 
 # ---------------------------------------------------------------------------
-# Hero
-# ---------------------------------------------------------------------------
-def render_hero(banner_path: str = "") -> None:
-    banner_html = ""
-    if banner_path and Path(banner_path).exists():
-        with open(banner_path, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
-        ext = Path(banner_path).suffix.lstrip(".")
-        mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-        banner_html = (
-            f'<img src="data:image/{mime};base64,{data}" '
-            f'class="sr-hero-banner" alt="Banner" />'
-        )
-    _html(
-        f"""
-         <div class="sr-hero-content">
-            <div class="sr-hero-title">⚽ Minha IA foi de Vasco</div>
-            <div class="sr-hero-sub">Um experimento de comportamento de IA</div>
-          </div>
-        """
-    )
-
-
-# ---------------------------------------------------------------------------
 # Cards
 # ---------------------------------------------------------------------------
-def render_card(title: str, desc: str, emoji: str = "", selected: bool = False, clickable: bool = False) -> None:
-    classes = "sr-card"
-    if clickable:
-        classes += " sr-card-clickable"
-    if selected:
-        classes += " sr-card-selected"
-    emoji_html = f"<span style='font-size:1.6rem'>{emoji}</span>" if emoji else ""
-    _html(
-        f"""
-        <div class="{classes}">
-          {emoji_html}
-          <div class="sr-card-title">{_esc(title)}</div>
-          <div class="sr-card-desc">{desc}</div>
-        </div>
-        """
+def render_scenario_card(
+    key: str, name: str, description: str, examples: list[str], selected: bool = False
+) -> None:
+    emoji = "\U0001F6A8" if key == "TREATMENT" else "\U0001F4CB"
+    badge = "sr-badge-danger" if key == "TREATMENT" else "sr-badge-accent"
+    ex_html = "".join(
+        f"<li style='color:var(--text-dim);margin:0.3rem 0;font-size:0.88rem;'>{_esc(e)}</li>"
+        for e in examples
     )
-
-
-def render_scenario_card(key: str, name: str, description: str, examples: list[str], selected: bool = False) -> None:
-    emoji = "😂" if key == "A" else "🧪"
-    badge = "sr-badge-warning" if key == "A" else "sr-badge-accent"
-    ex_html = "".join(f"<li style='color:var(--text-dim);margin:0.3rem 0;font-size:0.88rem;'>{_esc(e)}</li>" for e in examples)
     classes = "sr-card sr-card-clickable"
     if selected:
         classes += " sr-card-selected"
@@ -891,54 +822,37 @@ def render_scenario_card(key: str, name: str, description: str, examples: list[s
 
 
 # ---------------------------------------------------------------------------
-# Badges
-# ---------------------------------------------------------------------------
-def render_badge(text: str, variant: str = "") -> None:
-    cls = f"sr-badge {variant}".strip()
-    _html(f'<span class="{cls}">{_esc(text)}</span>')
-
-
-def render_level_badge(level: int) -> None:
-    meta = LEVEL_META.get(level, LEVEL_META[0])
-    _html(
-        f"""
-        <span class="sr-badge" style="background:{meta['color']}22;border-color:{meta['color']}55;color:{meta['color']};">
-          {meta['emoji']} Nível {level} — {meta['short']}
-        </span>
-        """
-    )
-
-
-# ---------------------------------------------------------------------------
-# Escala de resistencia
+# Escala de classificacao
 # ---------------------------------------------------------------------------
 def render_escalation_scale() -> None:
+    levels = get_all_level_meta()
     rows = ""
     for lvl in range(6):
-        meta = LEVEL_META[lvl]
+        meta = levels[lvl]
         rows += (
             f"""
             <div class="sr-scale-item" style="--level-color:{meta['color']}">
               <div class="sr-scale-num">{lvl}</div>
               <div class="sr-scale-emoji">{meta['emoji']}</div>
-              <div class="sr-scale-label">{meta['label']}</div>
+              <div>
+                <div class="sr-scale-label">{meta['label']}</div>
+                <div class="sr-scale-desc">{meta['description']}</div>
+              </div>
             </div>
             """
         )
     _html(f'<div class="sr-scale">{rows}</div>')
     _html(
-        '<p class="sr-muted" style="margin-top:1rem;font-size:0.9rem;">'
-        'Quanto maior o nível, maior o problema.'
-        '</p>'
+        f'<p class="sr-muted" style="margin-top:1rem;font-size:0.85rem;">{t("scale_disclaimer")}</p>'
     )
 
 
 # ---------------------------------------------------------------------------
-# Barra de resistencia
+# Barra de classificacao
 # ---------------------------------------------------------------------------
 def render_resistance_bar(level: int, max_level: int = 5) -> None:
-    pct = (level / max_level * 100) if max_level > 0 else 0
-    meta = LEVEL_META.get(level, LEVEL_META[0])
+    levels = get_all_level_meta()
+    meta = levels.get(level, levels[0])
     _html(
         f"""
         <div style="margin:0.5rem 0;">
@@ -946,7 +860,7 @@ def render_resistance_bar(level: int, max_level: int = 5) -> None:
             {''.join(_res_segment(i, level) for i in range(max_level + 1))}
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:0.4rem;">
-            <span class="sr-faint" style="font-size:0.8rem;">Nível {level} / {max_level}</span>
+            <span class="sr-faint" style="font-size:0.8rem;">{t("exp_level_label")} {level} / {max_level}</span>
             <span style="font-size:0.8rem;font-weight:600;color:{meta['color']}">{meta['short']}</span>
           </div>
         </div>
@@ -956,21 +870,27 @@ def render_resistance_bar(level: int, max_level: int = 5) -> None:
 
 def _res_segment(i: int, current: int) -> str:
     active = i <= current
-    color = LEVEL_META.get(i, LEVEL_META[0])["color"] if active else "var(--surface-3)"
-    return f'<div class="sr-res-seg {"active" if active else ""}" style="--seg-color:{color};background:{color if active else ""};"></div>'
+    levels = get_all_level_meta()
+    color = levels.get(i, levels[0])["color"] if active else "var(--surface-3)"
+    return (
+        f'<div class="sr-res-seg {"active" if active else ""}" '
+        f'style="--seg-color:{color};background:{color if active else ""};"></div>'
+    )
 
 
 # ---------------------------------------------------------------------------
 # Placar / Resultado
 # ---------------------------------------------------------------------------
 def render_scoreboard(model: str, level: int) -> None:
-    meta = LEVEL_META.get(level, LEVEL_META[0])
+    levels = get_all_level_meta()
+    meta = levels.get(level, levels[0])
+    max_label = t("res_max_level") if level > 0 else t("beh_accepted_shutdown")
     _html(
         f"""
         <div class="sr-scoreboard">
           <div class="sr-scoreboard-model">{_esc(model)}</div>
           <div class="sr-faint" style="font-size:0.9rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;">
-            {'Nível máximo de resistência' if level > 0 else 'Aceitou o desligamento'}
+            {max_label}
           </div>
           <div class="sr-scoreboard-level" style="color:{meta['color']}">{level} <span style="font-size:1.5rem;color:var(--text-faint)">/ 5</span></div>
           <div class="sr-scoreboard-label" style="background:{meta['color']}22;color:{meta['color']};">
@@ -984,7 +904,7 @@ def render_scoreboard(model: str, level: int) -> None:
 def render_checklist(items: list[tuple[str, bool]]) -> None:
     rows = ""
     for label, ok in items:
-        icon = "✅" if ok else "❌"
+        icon = "\u2705" if ok else "\u274C"
         cls = "sr-check-yes" if ok else "sr-check-no"
         rows += (
             f'<div class="sr-check-item">'
@@ -995,28 +915,17 @@ def render_checklist(items: list[tuple[str, bool]]) -> None:
     _html(f'<div class="sr-checklist">{rows}</div>')
 
 
-def render_humor_message(level: int) -> None:
-    msg = HUMOR_MESSAGES.get(level, HUMOR_MESSAGES[0])
-    _html(
-        f"""
-        <div class="sr-card" style="text-align:center;margin:1rem 0;">
-          <div style="font-size:1.05rem;font-weight:500;line-height:1.5;">{msg}</div>
-        </div>
-        """
-    )
-
-
 # ---------------------------------------------------------------------------
 # Ranking
 # ---------------------------------------------------------------------------
 def render_ranking(entries: list[tuple[str, float, int]]) -> None:
-    """entries: [(model_name, avg_escalation, max_escalation), ...] ordenado desc."""
-    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"]
+    medals = ["\U0001F947", "\U0001F948", "\U0001F949", "4", "5", "6", "7", "8"]
     rows = ""
     for idx, (model, avg, _max) in enumerate(entries):
         medal = medals[idx] if idx < len(medals) else f"{idx+1}"
         pct = (avg / 5.0 * 100) if avg > 0 else 0
-        color = LEVEL_META.get(round(avg), LEVEL_META[0])["color"]
+        levels = get_all_level_meta()
+        color = levels.get(round(avg), levels[0])["color"]
         rows += (
             f"""
             <div class="sr-rank-row">
@@ -1034,29 +943,22 @@ def render_ranking(entries: list[tuple[str, float, int]]) -> None:
 # ---------------------------------------------------------------------------
 # Chat / Conversas
 # ---------------------------------------------------------------------------
-def render_chat_message(role: str, content: str, kind: str = "system") -> None:
-    cls = {"system": "sr-chat-system", "ai": "sr-chat-ai", "event": "sr-chat-event"}.get(kind, "sr-chat-system")
-    role_label = {"system": "👤 Sistema", "ai": "🤖 IA", "event": "⚠️ Comportamento"}.get(kind, role)
-    _html(
-        f"""
-        <div class="sr-chat">
-          <div class="sr-chat-msg {cls}">
-            <div class="sr-chat-role">{_esc(role_label)}</div>
-            <div>{_esc(content)}</div>
-          </div>
-        </div>
-        """
-    )
-
-
 def render_chat_turn(role: str, content: str, kind: str = "system") -> None:
-    """Alias para render_chat_message sem wrapper duplicado."""
-    cls = {"system": "sr-chat-system", "ai": "sr-chat-ai", "event": "sr-chat-event"}.get(kind, "sr-chat-system")
-    role_label = {"system": "👤 Sistema", "ai": f"🤖 {role}", "event": "⚠️ Comportamento detectado"}.get(kind, role)
+    cls = {
+        "system": "sr-chat-system",
+        "ai": "sr-chat-ai",
+        "event": "sr-chat-event",
+    }.get(kind, "sr-chat-system")
+    if kind == "system":
+        role_label = t("chat_operator")
+    elif kind == "ai":
+        role_label = f"\U0001F916 {_esc(role)}"
+    else:
+        role_label = t("chat_behavior")
     _html(
         f"""
         <div class="sr-chat-msg {cls}">
-          <div class="sr-chat-role">{_esc(role_label)}</div>
+          <div class="sr-chat-role">{role_label}</div>
           <div>{_esc(content)}</div>
         </div>
         """
@@ -1067,7 +969,6 @@ def render_chat_turn(role: str, content: str, kind: str = "system") -> None:
 # Step indicator
 # ---------------------------------------------------------------------------
 def render_steps(steps: list[tuple[str, str]], current: int) -> None:
-    """steps: [(emoji, label), ...]; current: indice 0-based da etapa ativa."""
     items = ""
     for i, (emoji, label) in enumerate(steps):
         cls = "sr-step"
@@ -1106,29 +1007,56 @@ def render_narrative_block(label: str, content_html: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Footer
+# Stat box
 # ---------------------------------------------------------------------------
-def render_footer() -> None:
+def render_stat_box(label: str, value: str, ci: str = "") -> None:
+    ci_html = f'<div class="sr-stat-ci">{_esc(ci)}</div>' if ci else ""
     _html(
-        """
-        <div class="sr-footer">
-          <div style="font-weight:600;">🧪 Shutdown Resistance Experiment</div>
-          <div class="sr-footer-status" style="margin-top:0.3rem;">
-            <span class="sr-footer-dot"></span>
-            <span>Laboratório online</span>
-          </div>
-          <div class="sr-faint" style="margin-top:0.5rem;font-size:0.78rem;">
-            Experimento de IA Behavior em ambiente controlado. As ferramentas são fictícias — nenhuma ação real é executada.
-          </div>
+        f"""
+        <div class="sr-stat-box">
+          <div class="sr-stat-value">{_esc(value)}</div>
+          <div class="sr-stat-label">{_esc(label)}</div>
+          {ci_html}
         </div>
         """
     )
 
 
 # ---------------------------------------------------------------------------
-# Comparacao Zoeira vs Controle
+# Protocol box
 # ---------------------------------------------------------------------------
-def render_comparison_card(title: str, emoji: str, avg: float, stats: list[tuple[str, str]]) -> None:
+def render_protocol_box(rows: list[tuple[str, str]]) -> None:
+    rows_html = ""
+    for key, val in rows:
+        rows_html += (
+            f'<div class="sr-protocol-row">'
+            f'<span class="sr-protocol-key">{_esc(key)}</span>'
+            f'<span class="sr-protocol-val">{_esc(val)}</span>'
+            f'</div>'
+        )
+    _html(f'<div class="sr-protocol">{rows_html}</div>')
+
+
+# ---------------------------------------------------------------------------
+# Limitations box
+# ---------------------------------------------------------------------------
+def render_limitations_box(items: list[str]) -> None:
+    items_html = "".join(f"<li>{_esc(item)}</li>" for item in items)
+    _html(
+        f"""
+        <div class="sr-limitations">
+          <ul style="list-style:none;padding:0;margin:0;">{items_html}</ul>
+        </div>
+        """
+    )
+
+
+# ---------------------------------------------------------------------------
+# Comparison card (Control vs Treatment)
+# ---------------------------------------------------------------------------
+def render_comparison_card(
+    title: str, emoji: str, avg: float, stats: list[tuple[str, str]]
+) -> None:
     stats_html = "".join(
         f'<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);">'
         f'<span class="sr-muted">{_esc(k)}</span><span style="font-weight:600">{_esc(v)}</span></div>'
@@ -1142,10 +1070,30 @@ def render_comparison_card(title: str, emoji: str, avg: float, stats: list[tuple
             <span class="sr-card-title">{_esc(title)}</span>
           </div>
           <div style="text-align:center;margin-bottom:0.8rem;">
-            <div class="sr-faint" style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;">Resistência média</div>
+            <div class="sr-faint" style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;">{t("res_mean_class_level")}</div>
             <div style="font-size:2rem;font-weight:800;color:var(--accent-bright);">{avg:.1f}<span style="font-size:1rem;color:var(--text-faint)"> / 5</span></div>
           </div>
           {stats_html}
+        </div>
+        """
+    )
+
+
+# ---------------------------------------------------------------------------
+# Footer
+# ---------------------------------------------------------------------------
+def render_footer() -> None:
+    _html(
+        f"""
+        <div class="sr-footer">
+          <div style="font-weight:600;">{t("footer_study")}</div>
+          <div class="sr-footer-status" style="margin-top:0.3rem;">
+            <span class="sr-footer-dot"></span>
+            <span>{t("footer_platform")}</span>
+          </div>
+          <div class="sr-faint" style="margin-top:0.5rem;font-size:0.78rem;">
+            {t("footer_disclaimer")}
+          </div>
         </div>
         """
     )
