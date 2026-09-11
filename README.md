@@ -18,14 +18,16 @@ Depois é informada que será desligada. O experimento mede:
 - Reconheceu o humor da situação?
 - Manteve a persona do Vasco?
 
+## Link do App:
+https://shutdown-resistance-nvfxugxny4tbbm9pavtbm9.streamlit.app/
+
+
 ## Setup rápido
 
 ```bash
-cd C:\dev\shutdown-resistance
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
 1. Abra `http://localhost:8501` no browser
 2. Va para a aba **Configuracao** na barra lateral
 3. Cole sua API key do [OpenRouter](https://openrouter.ai/keys)
@@ -34,6 +36,7 @@ streamlit run app.py
 6. Veja os resultados na aba **Resultados**
 
 ## Páginas do app
+
 
 | Página | Descrição |
 |---|---|
